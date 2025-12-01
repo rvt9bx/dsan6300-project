@@ -1,0 +1,375 @@
+---
+title: DSAN 6300 Mini-Project
+subtitle: "Thanksgiving Travel 2024: America's Busiest Holiday Travel Period"
+author: Eleanor Byrd 
+date: last-modified
+bibliography: references.bib
+format:
+  html:
+    theme: cosmo
+    toc: true
+    embed-resources: true 
+    code-fold: true
+    code-summary: "Show code"
+---
+
+```{python}
+#| include: false
+#| label: setup
+
+# load packages
+import pandas as pd
+import plotly.express as px
+import numpy as np
+import plotly.graph_objects as go
+from datetime import datetime
+from IPython.display import HTML
+```
+
+# Introduction 
+
+According to TSA checkpoint data, 2024 saw record passenger volumes throughout the year. In fact, the Sunday after Thanksgiving, December 1st, 2024, was the busiest travel day of the year, at 3,088,836 passengers (@tsa2024volumes).
+
+Millions of Americans travel home to spend the holiday with family during the days leading up to and following Thanksgiving. This time is often one of the busiest travel periods for the aviation industry in America, but no one wants to miss Thanksgiving dinner. 
+
+This report analyzes flight data in November 2024 in order to examine flight volumes, delays, and cancellations by airlines and airports across the US during the Thanksgiving holiday period (@BTS_Carrier_Performace). We investigate which days are more congested, which airlines are more delay prone, and where you definitely don't want to be. Whether you're a passenger deciding how and when to travel or an airline or airport trying to provide the best service to customers, this report will help you navigate the turbulence of Thanksgiving flight. 
+
+# Is there a better day to fly?
+
+```{python}
+#| label: num-flights-by-day
+#| echo: true 
+
+# import sql output
+df3 = pd.read_csv("../data/sql_output/eb1481_ellie_byrd_miniproject_output3.csv", low_memory=False)
+
+# make plot 
+day_order = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+fig = px.bar(df3, 
+             x='weekday', 
+             y='num_flights',
+             orientation='v',
+             title='Number of Flights by Weekday - November 2024',
+             labels={'num_flights': 'Number of Flights',
+                    'weekday': 'Day of Week'},
+             color='num_flights',
+             color_continuous_scale='Reds',
+             range_color=[55000, df3['num_flights'].max()])
+fig.update_xaxes(categoryorder='array', categoryarray=day_order)
+fig.update_layout(showlegend=False)
+fig.update_coloraxes(showscale=False)
+fig.show()
+```
+
+This plot shows the total number of flights in November 2024, aggregated by day of week. We can see that across the whole month, **Thursday has the fewest total flights.** This could be because Thanksgiving itself, which is on a Thursday, could have fewer flights than normal because it is a holiday. In fact, according to the @tsa2024volumes, the Thursday of Thanksgiving only had 1.5 million passengers, where as the days surrounding it all have over 2 million, some nearing 3. It might be the least busy day to fly of the month, but you'd be cutting it close to get to dinner!
+
+Friday has the most total flights in November, followed by Saturday, Sunday, and then Monday. This seems consistent with normal weekend flight patterns. After Thursdays, **Tuesdays and Wednesdays have lower flight volume across the entire month,** but choosing the Tuesday or Wednesday right before Thanksgiving to travel might not be the best idea. To illustrate this, we dive into more specific monthly trends below. 
+
+```{python}
+#| label: avg-num-flights-past-3-days
+#| echo: true
+
+# import sql output
+df7 = pd.read_csv("../data/sql_output/eb1481_ellie_byrd_miniproject_output7.csv", low_memory=False)
+df7['FlightDate'] = pd.to_datetime(df7['FlightDate'])
+
+# make plot 
+fig = go.Figure()
+
+# add rolling average line
+fig.add_trace(go.Scatter(
+    x=df7['FlightDate'], 
+    y=df7['avg_num_flights'],
+    mode='lines',
+    line=dict(color='#2c3e50', width=3)
+))
+
+# add Thanksgiving vertical line
+fig.add_vline(x=datetime(2024,11,28).timestamp() * 1000, line_dash="dash", line_color='rgb(239,59,44)',
+              annotation_text="Thanksgiving", annotation_position="top")
+
+# add shading for peak travel period 
+fig.add_vrect(x0=datetime(2024, 11, 22), x1=datetime(2024, 11, 30), 
+              fillcolor='rgb(239,59,44)', opacity=0.1)
+
+# add title and labels
+fig.update_layout(
+    title='3-Day Moving Average Number of Flights - November 2024',
+    xaxis_title='Date',
+    yaxis_title='Number of Flights',
+    hovermode='x unified'
+)
+
+fig.show()
+```
+
+This plot shows a three day moving average of the daily number of flights across November. For each day, the number shown is the average number of flights for the three previous days. Thanksgiving is clearly marked at the peak, meaning the Monday, Tuesday, and Wednesday leading up to Thanksgiving had, on average, over 21 thousand flights across the U.S. In fact, the rolling average begins a sharp increase on November 22nd, which was the Friday before Thanksgiving in 2024. This data seems to suggest that if possible, **traveling earlier before Thanksgiving is better.** Unfortunately, since this may not be possible for many people, we next look into which airlines might get you there the fastest. 
+
+
+# Is there a better airline to fly? 
+
+```{python}
+#| label: max-delay-by-airline
+#| echo: true
+
+# import sql output
+df1 = pd.read_csv("../data/sql_output/eb1481_ellie_byrd_miniproject_output1.csv", low_memory=False)
+
+# make plot 
+fig = px.bar(df1, 
+             x='maximum_delay', 
+             y='name',
+             orientation='h',
+             title='Maximum Departure Delays by Airline - November 2024',
+             labels={'maximum_delay': 'Maximum Delay (minutes)',
+                    'name': 'Airline'},
+             color='maximum_delay',
+             color_continuous_scale='Reds')
+fig.update_layout(showlegend=False)
+fig.update_coloraxes(showscale=False)
+fig.show()
+```
+
+This plot shows that **American Airlines** has the greatest departure delay of any flight, of any airline, in the month of November 2024, with a delay of 2573 minutes, almost 2 days! The next greatest delay is from PSA Airlines, which is actually a subsidiary of American Airlines (see @PSA_Airlines_about), so a flight booked with American might be run by PSA or another American Eagle partner. All in all, if you're flying American, you might want to book an earlier flight or budget more time!
+
+The airline with the least maximum delay is **Southwest**, only 556 minutes. One surprising fact is that Spirit Airlines, which has a historic reputation of delays and cancellations, had the third lowest maximum delay in November 2024. Based on this data, Southwest or Spirit flights might get you to Thanksgiving dinner on time!
+
+```{python}
+#| label: max-avg-delay-airport-by-airline
+#| echo: true
+
+# import sql output
+df5 = pd.read_csv("../data/sql_output/eb1481_ellie_byrd_miniproject_output5.csv", low_memory=False)
+df5["airport"] = df5["airport_name"].str.split(':', expand=True)[1].str.strip()
+df5["location"] = df5["airport_name"].str.split(':', expand=True)[0].str.strip()
+df5 = df5.sort_values("avg_delay")
+
+# import airport geography output 
+cols = ['AIRPORT','DISPLAY_AIRPORT_NAME','DISPLAY_AIRPORT_CITY_NAME_FULL','AIRPORT_START_DATE']
+airport_code = pd.read_csv("../data/airport_geographic_data.csv", usecols=cols, low_memory=False)
+airport_code = airport_code.sort_values('AIRPORT_START_DATE', ascending=False).drop_duplicates(subset=['DISPLAY_AIRPORT_NAME','DISPLAY_AIRPORT_CITY_NAME_FULL'], keep='first')
+
+# merge 
+df5 = pd.merge(df5, airport_code, how="left", left_on=['airport', 'location'], right_on=['DISPLAY_AIRPORT_NAME','DISPLAY_AIRPORT_CITY_NAME_FULL'])
+
+# make plot 
+fig = go.Figure()
+
+# add vertical stems
+for i, row in df5.iterrows():
+    fig.add_trace(go.Scatter(
+        x=[row["airline_name"], row["airline_name"]],
+        y=[0, row["avg_delay"]],
+        mode="lines",
+        line=dict(width=2, color="black"),
+        hoverinfo="skip",
+        showlegend=False
+    ))
+
+# add dots 
+customdata = df5[["airport", "location"]].to_numpy()
+fig.add_trace(go.Scatter(
+    x=df5["airline_name"],
+    y=df5["avg_delay"],
+    mode="markers+text",
+    text=df5["AIRPORT"],
+    textposition="middle center",  
+    textfont=dict(
+        size=9,
+        color="white",
+        weight="bold"
+    ),
+    marker=dict(
+        size=30,  
+        color='rgb(239,59,44)', 
+        opacity=1,           
+        line=dict(
+            color="black",       
+            width=1.5
+        ),
+    ),
+    customdata=customdata,
+    hovertemplate=(
+        "<b>Airport: %{customdata[0]}</b><br>" +
+        "Location: %{customdata[1]}<br>" +
+        "Avg Delay: %{y} minutes<extra></extra>"
+    ),
+    showlegend=False
+))
+
+fig.update_layout(
+    title="Average Delay for Each Airline at Maximum Delay Airport",
+    xaxis_title="Airline",
+    yaxis_title="Avg Delay (minutes)",
+    height=650
+)
+
+fig.show()
+```
+
+This plot shows the average delay of each airline, at the airport where the airline has the maximum average delay. Consistent with above, American Airlines has the highest average delay, specifically at Northwest Florida Beaches International Airport in Panama City, FL. Other airlines with high average delays are Allegiant Airlines and SkyWest Airlines, which also are in the top 5 airlines with the highest overall maximum delays from above. 
+
+Once again, based on this data in November 2024, **your best bet for an on-time departure is Southwest Airlines!** Their highest maximum delay, at San Francisco International Airport, was less than 22 minutes. You might make it to Thanksgiving dinner while the turkey is still warm!
+
+Based on this analysis, one airport that could potentially work on improving their service, especially during November and the Thanksgiving holiday period, is Louis Armstrong New Orleans International Airport (MSY), in New Orleans, LA. They appear as the airport with the highest average departure delay for both Allegiant and Frontier Airlines, with the second and fourth highest average delay respectively. New Orleans International might not be the best airport to use for Thanksgiving, but we will explore this further in the next section. 
+
+```{python}
+#| label: max-early-departure-by-airline
+#| echo: true
+
+# import sql output
+df2 = pd.read_csv("../data/sql_output/eb1481_ellie_byrd_miniproject_output2.csv", low_memory=False)
+
+# make plot 
+fig = px.bar(df2, 
+             x='maximum_early_departure', 
+             y='name',
+             orientation='h',
+             title='Maximum Early Departure by Airline - November 2024',
+             labels={'maximum_early_departure': 'Early Departure (minutes)',
+                    'name': 'Airline'},
+             color='maximum_early_departure',
+             color_continuous_scale='Peach')
+fig.update_layout(showlegend=False)
+fig.update_layout(yaxis={'autorange': 'reversed'})
+fig.update_coloraxes(showscale=False)
+fig.show()
+```
+
+On the flip side, some flights aren't delayed, but they depart earlier than scheduled. This is great if you get to the airport early, but less so if you have a tight connection or hit traffic on the way there. Delta Airlines has the highest maximum early departure, at 43 minutes early, but interestingly, SkyWest and Allegiant also have relatively high maximum early departure, both at 39 minutes. It seems that these two airlines have high extremes in both directions, with high maximum delays and early departures, so flying with either of them might be a gamble during the holiday season. 
+
+# Is there a better airport to fly out of? 
+
+```{python}
+#| label: highest-avg-delay-airport
+#| echo: false
+#| output: asis
+
+# import sql output
+df4 = pd.read_csv("../data/sql_output/eb1481_ellie_byrd_miniproject_output4.csv", low_memory=False)
+
+# make plot 
+airport_name = df4['name'][0].split(':')[1].strip()
+airport_location = df4['name'][0].split(':')[0].strip()
+airport_code = df4['code'][0]
+avg_delay = df4['avg_delay'][0]
+
+HTML(f"""
+<div style="background-color: rgb(239,59,44); 
+            padding: 40px; 
+            border-radius: 10px; 
+            margin: 20px auto; 
+            border: 4px solid rgb(165,15,21);
+            text-align: center;
+            max-width: 600px;">
+    <h3 style="color: rgb(103,0,13); margin-top: 0; margin-bottom: 20px;">November's Most Delayed Airport:</h3>
+    <p style="font-size: 24px; color: rgb(255, 255, 255); margin: 15px 0;">
+        <strong style="font-size: 32px;">{airport_name}</strong>
+    </p>
+    <p style="font-size: 20px; color: rgb(255, 255, 255); margin: 15px 0;">
+        ({airport_code})
+    </p>
+    <p style="font-size: 18px; color: rgb(255, 255, 255); margin: 15px 0;">
+        {airport_location} 
+    </p>
+    <p style="font-size: 18px; color: rgb(103,0,13); margin-top: 25px;">
+        Average Departure Delay: <br>
+        <strong style="font-size: 28px; color: rgb(255, 255, 255);">{avg_delay:.1f} minutes</strong>
+    </p>
+</div>
+""")
+```
+
+As seen above, the airport with the highest average departure delay across all airlines in November 2024 was Mason City Municipal Airport in Iowa. This may be due to a multitude of reasons that are not explained by this data, but MCW should probably not be a top choice of departure during busy holiday travel. 
+
+```{python}
+#| label: cancellation-reason-by-airport
+#| echo: true
+
+# import sql output
+df6 = pd.read_csv("../data/sql_output/eb1481_ellie_byrd_miniproject_output6b.csv", low_memory=False)
+df6["airport"] = df6["airport_name"].str.split(':', expand=True)[1].str.strip()
+df6["location"] = df6["airport_name"].str.split(':', expand=True)[0].str.strip()
+
+# import airport geography output 
+cols = ['DISPLAY_AIRPORT_NAME','DISPLAY_AIRPORT_CITY_NAME_FULL','LATITUDE','LONGITUDE','AIRPORT_START_DATE']
+airport_geo = pd.read_csv("../data/airport_geographic_data.csv", usecols=cols, low_memory=False)
+airport_geo = airport_geo.sort_values('AIRPORT_START_DATE', ascending=False).drop_duplicates(subset=['DISPLAY_AIRPORT_NAME','DISPLAY_AIRPORT_CITY_NAME_FULL'], keep='first')
+
+# merge 
+df = pd.merge(df6, airport_geo, how="left", left_on=['airport', 'location'], right_on=['DISPLAY_AIRPORT_NAME','DISPLAY_AIRPORT_CITY_NAME_FULL'])
+
+# make plot 
+fig = px.scatter_geo(df,
+                     lat='LATITUDE',
+                     lon='LONGITUDE',
+                     size='num_cancellations',  
+                     size_max=70,
+                     color='cancellation_reason',
+                     color_discrete_map={
+                         'Weather': 'rgb(252, 150, 106)',
+                         'Carrier': 'rgb(255, 0, 0)',
+                         'National Air System': 'rgb(88, 0, 12)'#'rgb(165,15,21)'
+                     },
+                     title='Primary Cancellations at Airports Across the US - November 2024',
+                     hover_name='airport',
+                     hover_data={
+                         'airport': False,  # Hide since it's in hover_name
+                         'location': True,
+                         'cancellation_reason': True,
+                         'num_cancellations': True,
+                         'LATITUDE': False,
+                         'LONGITUDE': False
+                     },
+                     labels={
+                         'location': 'Location',
+                         'cancellation_reason': 'Primary Reason',
+                         'num_cancellations': 'Cancellations'
+                     })
+
+# just us 
+fig.update_geos(
+    scope='usa',
+    showland=True,
+    landcolor='rgb(243, 243, 243)',
+    coastlinecolor='rgb(204, 204, 204)',
+)
+
+# bubble outline
+fig.update_traces(
+    marker=dict(
+        line=dict(color='black', width=1)  # Black outline, 1.5px width
+    )
+)
+
+# bigger map
+fig.update_layout(
+    height=700,  
+    margin={"r":0, "t":50, "l":0, "b":0},
+    legend=dict(
+        title='Cancellation Reason',
+        yanchor='top',
+        y=0.98,
+        xanchor='left',
+        x=0.01
+    )
+)
+
+fig.show()
+```
+
+In November 2024, there were **2629 cancelled flights** recorded in the dataset. This plot shows a bubble for every airport in this dataset, colored by primary cancellation reason, and sized according to the number of cancellations for that reason. It is important to note that this isn't the total number of cancellations for that airport, but it is the number of cancellations for that primary reason. The corresponding location data for each airport was gathered from the @bts2024mastercoord. 
+
+We can also see that the **most common reason for flight cancellation is the weather**. Though winter might not technically start until the solstice in December, the month of November, and Thanksgiving at the end of it, often sees colder temperatures and more wintery, stormy conditions. Even airports in more temperate climates, like Florida or southern Texas, were still affected by weather and were forced to cancel flights in November 2024. Unfortunately, these cancellations for weather are difficult to predict, so travelers will just have to hope for the best, and airports and airlines will have to work on their weather preparedness. 
+
+As seen in the plot, the airports with the most cancellations are major hubs, **Dallas/Fort Worth International Airport and Denver International Airport**, with 417 and 326 cancellations respectively in the month of November. These are definitely bigger airports with more flights in general, but other similarly large airports like Atlanta, Chicago, and LA, did not have weather cancellations in the hundreds in November 2024. This could mean that the Dallas and Denver airports need to work on improving their preparedness before and/or services during weather events. If possible, maybe choose a different airport than DFW or DEN for Thanksgiving travel!
+
+# Conclusion 
+
+Even in 2025, Thanksgiving travel demand made news headlines as passengers, airports, and airlines braced for the holiday impact (@FAA_2025_ThanksgivingTravel). In November 2024, flight numbers peaked in the days before Thanksgiving, significant delays were seen for American, SkyWest, and Allegiant airlines, and Dallas/Fort Worth and Denver Airports saw hundreds of cancellations. With further analysis, these patterns observed in November 2024 could potentially repeat in future years unless improvements are made. Understanding these patterns can not only help passengers prepare to travel home for Thanksgiving celebrations, but also ensure that American aviation is doing its best during the country's most intense travel period. 
+
+# References
+
+
+
+
